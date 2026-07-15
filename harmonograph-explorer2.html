@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <!--
+    The viewport meta tag ensures the interface scales correctly on phones,
+    tablets, and desktop screens.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Harmonograph Explorer</title>
+
+  <style>
+    /*
+      ------------------------------------------------------------------------
+      1. DESIGN TOKENS
+      ------------------------------------------------------------------------
+      CSS custom properties keep the color palette and spacing consistent.
+      Changing these values updates the entire interface.
+    */
+    :root {
+      --page-bg-start: #eef2ff;
+      --page-bg-end: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --surface: #f8fafc;
+      --surface-strong: #eef2ff;
+      --text-main: #172033;
+      --text-muted: #5d667a;
+      --border: #d8deeb;
+      --accent: #5b5bd6;
+      --accent-dark: #4141aa;
+      --accent-soft: #e8e8ff;
+      --curve-start: #7c3aed;
+      --curve-end: #06b6d4;
+      --focus-ring: rgba(91, 91, 214, 0.28);
+      --success: #087f5b;
+      --shadow: 0 18px 45px rgba(31, 41, 55, 0.12);
+      --radius-large: 22px;
+      --radius-medium: 14px;
+      --radius-small: 9px;
+    }
+
+    /*
+      Use border-box sizing so padding and borders remain inside each
+      element's declared width.
+    */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: clamp(1rem, 3vw, 2.5rem);
+      color: var(--text-main);
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(124, 58, 237, 0.12), transparent 34rem),
+        linear-gradient(145deg, var(--page-bg-start), var(--page-bg-end));
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    /*
+      The application has a centered maximum width so it stays readable
+      on very large displays.
+    */
+    .app-shell {
+      width: min(1180px, 100%);
+      margin-inline: auto;
+    }
+
+    .page-header {
+      margin-bottom: 1.35rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.45rem;
+      color: var(--accent-dark);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 16ch;
+      margin-bottom: 0.55rem;
+      font-size: clamp(2rem, 6vw, 4.25rem);
+      line-height: 0.98;
+      letter-spacing: -0.055em;
+    }
+
+    .intro {
+      max-width: 70ch;
+      margin-bottom: 0;
+      color: var(--text-muted);
+      font-size: clamp(1rem, 2vw, 1.12rem);
+      line-height: 1.65;
+    }
+
+    /*
+      On wide screens, controls and visualization appear side by side.
+      On narrow screens, the grid automatically collapses into one column.
+    */
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(270px, 360px) minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .card {
+      border: 1px solid rgba(216, 222, 235, 0.9);
+      border-radius: var(--radius-large);
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .controls-card {
+      padding: clamp(1rem, 3vw, 1.5rem);
+    }
+
+    .chart-card {
+      min-width: 0;
+      padding: clamp(0.85rem, 2.5vw, 1.25rem);
+    }
+
+    .section-heading {
+      margin-bottom: 0.35rem;
+      font-size: 1.2rem;
+    }
+
+    .section-copy {
+      margin-bottom: 1.25rem;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    /*
+      Each slider group contains its label, current numeric value,
+      input control, and descriptive range labels.
+    */
+    .control-group {
+      margin-bottom: 1.2rem;
+    }
+
+    .control-label-row {
+      display: flex;
+      gap: 1rem;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.45rem;
+    }
+
+    .control-label-row label {
+      font-weight: 750;
+    }
+
+    .control-value {
+      min-width: 5.75rem;
+      color: var(--accent-dark);
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    input[type="range"]:focus-visible {
+      outline: 4px solid var(--focus-ring);
+      outline-offset: 4px;
+      border-radius: 999px;
+    }
+
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.32rem;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+    }
+
+    /*
+      Buttons share a common base style, while secondary buttons use a
+      lighter visual treatment.
+    */
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+      margin-top: 1.4rem;
+    }
+
+    .button {
+      min-height: 46px;
+      padding: 0.72rem 1rem;
+      border: 1px solid transparent;
+      border-radius: var(--radius-small);
+      font-weight: 800;
+      cursor: pointer;
+      transition:
+        transform 150ms ease,
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 150ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button:active {
+      transform: translateY(0);
+    }
+
+    .button:focus-visible {
+      outline: 4px solid var(--focus-ring);
+      outline-offset: 3px;
+    }
+
+    .button-primary {
+      color: white;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(91, 91, 214, 0.25);
+    }
+
+    .button-primary:hover {
+      background: var(--accent-dark);
+    }
+
+    .button-secondary {
+      color: var(--text-main);
+      border-color: var(--border);
+      background: white;
+    }
+
+    .button-secondary:hover {
+      border-color: #b9c1d3;
+      background: var(--surface);
+    }
+
+    .equation-panel {
+      margin-top: 1.4rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-medium);
+      background: var(--surface);
+    }
+
+    .equation-panel strong {
+      display: block;
+      margin-bottom: 0.65rem;
+      font-size: 0.86rem;
+    }
+
+    .equation {
+      margin-bottom: 0.35rem;
+      overflow-wrap: anywhere;
+      color: #30384a;
+      font-family:
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .equation:last-child {
+      margin-bottom: 0;
+    }
+
+    /*
+      The SVG uses a fixed viewBox, but scales responsively to fill the card.
+      aspect-ratio prevents layout shifts while the page loads.
+    */
+    .chart-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 320px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius-large) - 7px);
+      background:
+        linear-gradient(rgba(91, 91, 214, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91, 91, 214, 0.045) 1px, transparent 1px),
+        white;
+      background-size: 32px 32px;
+    }
+
+    #harmonographSvg {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+    }
+
+    .axis-line {
+      stroke: #c9cfdd;
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .boundary-circle {
+      fill: none;
+      stroke: #e1e5ef;
+      stroke-width: 1.25;
+      stroke-dasharray: 5 7;
+      vector-effect: non-scaling-stroke;
+    }
+
+    /*
+      A rounded line cap gives the animated curve a softer, ink-like tip.
+    */
+    #harmonographPath {
+      fill: none;
+      stroke: url("#curveGradient");
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    /*
+      The moving pen marker helps communicate that the path is being drawn
+      over time rather than revealed all at once.
+    */
+    #penMarker {
+      fill: white;
+      stroke: var(--curve-start);
+      stroke-width: 3;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 2px 4px rgba(31, 41, 55, 0.25));
+    }
+
+    .chart-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem 1rem;
+      justify-content: space-between;
+      margin-top: 0.85rem;
+      color: var(--text-muted);
+      font-size: 0.84rem;
+    }
+
+    .status-value {
+      color: var(--text-main);
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /*
+      This description remains visible to sighted users and is also marked
+      as a live region for screen readers.
+    */
+    .description-box {
+      margin-top: 1rem;
+      padding: 1rem 1.05rem;
+      border-left: 5px solid var(--accent);
+      border-radius: 0 var(--radius-medium) var(--radius-medium) 0;
+      background: var(--surface-strong);
+      color: #30384a;
+      line-height: 1.6;
+    }
+
+    .description-box strong {
+      color: var(--text-main);
+    }
+
+    /*
+      This class visually hides text while preserving it for assistive
+      technologies. It is useful for detailed SVG descriptions.
+    */
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    @media (max-width: 780px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        max-width: 12ch;
+      }
+
+      .chart-wrap {
+        min-height: 260px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      body {
+        padding: 0.8rem;
+      }
+
+      .button-row {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-status {
+        display: block;
+      }
+
+      .chart-status span {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+    }
+
+    /*
+      Respect the user's reduced-motion operating-system preference.
+      The visualization still works, but the animation completes immediately.
+    */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <p class="eyebrow">Interactive mathematics</p>
+      <h1>Harmonograph Explorer</h1>
+      <p class="intro">
+        Adjust two damped oscillations and watch their combined motion trace
+        a geometric curve. Closely related frequencies create slowly changing
+        loops, while simple frequency ratios produce more regular symmetry.
+      </p>
+    </header>
+
+    <div class="workspace">
+      <!--
+        ======================================================================
+        CONTROLS
+        ======================================================================
+        Each slider has:
+        - A visible label
+        - A live numeric output
+        - aria-describedby text explaining what it changes
+      -->
+      <section class="card controls-card" aria-labelledby="controlsHeading">
+        <h2 class="section-heading" id="controlsHeading">Pendulum controls</h2>
+        <p class="section-copy">
+          Moving any slider recalculates the curve and restarts the drawing
+          animation from the beginning.
+        </p>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <label for="frequency1">
+              Frequency f<sub>1</sub>
+            </label>
+            <output class="control-value" id="frequency1Value" for="frequency1">
+              2.00
+            </output>
+          </div>
+
+          <input
+            id="frequency1"
+            type="range"
+            min="0.5"
+            max="8"
+            step="0.01"
+            value="2"
+            aria-describedby="frequency1Help"
+          />
+
+          <div class="range-labels" aria-hidden="true">
+            <span>0.5</span>
+            <span>8.0</span>
+          </div>
+
+          <span class="sr-only" id="frequency1Help">
+            Controls the horizontal oscillation frequency.
+          </span>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <label for="frequency2">
+              Frequency f<sub>2</sub>
+            </label>
+            <output class="control-value" id="frequency2Value" for="frequency2">
+              3.00
+            </output>
+          </div>
+
+          <input
+            id="frequency2"
+            type="range"
+            min="0.5"
+            max="8"
+            step="0.01"
+            value="3"
+            aria-describedby="frequency2Help"
+          />
+
+          <div class="range-labels" aria-hidden="true">
+            <span>0.5</span>
+            <span>8.0</span>
+          </div>
+
+          <span class="sr-only" id="frequency2Help">
+            Controls the vertical oscillation frequency.
+          </span>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <label for="phase1">
+              Phase p<sub>1</sub>
+            </label>
+            <output class="control-value" id="phase1Value" for="phase1">
+              0°
+            </output>
+          </div>
+
+          <input
+            id="phase1"
+            type="range"
+            min="0"
+            max="360"
+            step="1"
+            value="0"
+            aria-describedby="phase1Help"
+          />
+
+          <div class="range-labels" aria-hidden="true">
+            <span>0°</span>
+            <span>360°</span>
+          </div>
+
+          <span class="sr-only" id="phase1Help">
+            Sets the starting angle of the horizontal oscillation.
+          </span>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <label for="phase2">
+              Phase p<sub>2</sub>
+            </label>
+            <output class="control-value" id="phase2Value" for="phase2">
+              90°
+            </output>
+          </div>
+
+          <input
+            id="phase2"
+            type="range"
+            min="0"
+            max="360"
+            step="1"
+            value="90"
+            aria-describedby="phase2Help"
+          />
+
+          <div class="range-labels" aria-hidden="true">
+            <span>0°</span>
+            <span>360°</span>
+          </div>
+
+          <span class="sr-only" id="phase2Help">
+            Sets the starting angle of the vertical oscillation.
+          </span>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <label for="decay">
+              Friction decay d
+            </label>
+            <output class="control-value" id="decayValue" for="decay">
+              0.020
+            </output>
+          </div>
+
+          <input
+            id="decay"
+            type="range"
+            min="0"
+            max="0.12"
+            step="0.001"
+            value="0.02"
+            aria-describedby="decayHelp"
+          />
+
+          <div class="range-labels" aria-hidden="true">
+            <span>None</span>
+            <span>Strong</span>
+          </div>
+
+          <span class="sr-only" id="decayHelp">
+            Controls how quickly friction reduces the oscillation amplitude.
+          </span>
+        </div>
+
+        <!--
+          Play/Pause changes the animation state without recalculating points.
+          Reset returns the drawing cursor to the beginning and starts again.
+        -->
+        <div class="button-row">
+          <button
+            class="button button-primary"
+            id="playPauseButton"
+            type="button"
+            aria-pressed="false"
+          >
+            Pause
+          </button>
+
+          <button
+            class="button button-secondary"
+            id="resetButton"
+            type="button"
+          >
+            Reset drawing
+          </button>
+        </div>
+
+        <div class="equation-panel" aria-label="Active harmonograph equations">
+          <strong>Physical decay model</strong>
+          <p class="equation">
+            x(t) = sin(f<sub>1</sub> · t + p<sub>1</sub>) · e<sup>−d·t</sup>
+          </p>
+          <p class="equation">
+            y(t) = sin(f<sub>2</sub> · t + p<sub>2</sub>) · e<sup>−d·t</sup>
+          </p>
+        </div>
+      </section>
+
+      <!--
+        ======================================================================
+        VISUALIZATION
+        ======================================================================
+        The graph is an inline SVG, so it requires no charting library.
+      -->
+      <section class="card chart-card" aria-labelledby="chartHeading">
+        <h2 class="section-heading" id="chartHeading">Animated curve</h2>
+        <p class="section-copy">
+          The glowing point represents the harmonograph pen as it moves.
+        </p>
+
+        <div class="chart-wrap">
+          <svg
+            id="harmonographSvg"
+            viewBox="0 0 700 700"
+            role="img"
+            aria-labelledby="svgTitle svgDescription"
+          >
+            <title id="svgTitle">Animated harmonograph curve</title>
+
+            <desc id="svgDescription">
+              A damped parametric curve generated from two perpendicular sine
+              waves. The curve is drawn progressively from its outer motion
+              toward the center.
+            </desc>
+
+            <defs>
+              <!--
+                The path gradient changes color diagonally across the chart.
+              -->
+              <linearGradient
+                id="curveGradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#7c3aed" />
+                <stop offset="100%" stop-color="#06b6d4" />
+              </linearGradient>
+            </defs>
+
+            <!-- Reference boundary and center axes -->
+            <circle
+              class="boundary-circle"
+              cx="350"
+              cy="350"
+              r="300"
+              aria-hidden="true"
+            />
+
+            <line
+              class="axis-line"
+              x1="50"
+              y1="350"
+              x2="650"
+              y2="350"
+              aria-hidden="true"
+            />
+
+            <line
+              class="axis-line"
+              x1="350"
+              y1="50"
+              x2="350"
+              y2="650"
+              aria-hidden="true"
+            />
+
+            <!--
+              JavaScript continually updates this path's "d" attribute.
+            -->
+            <path id="harmonographPath" d="" />
+
+            <!--
+              The marker follows the latest point in the visible path.
+            -->
+            <circle
+              id="penMarker"
+              cx="350"
+              cy="350"
+              r="6"
+              aria-hidden="true"
+            />
+          </svg>
+        </div>
+
+        <div class="chart-status" aria-hidden="true">
+          <span>
+            Ratio:
+            <span class="status-value" id="ratioStatus">2.00 : 3.00</span>
+          </span>
+
+          <span>
+            Drawing:
+            <span class="status-value" id="progressStatus">0%</span>
+          </span>
+
+          <span>
+            State:
+            <span class="status-value" id="animationStatus">Playing</span>
+          </span>
+        </div>
+
+        <!--
+          aria-live="polite" means screen readers announce changes after the
+          user finishes adjusting a control, without interrupting immediately.
+        -->
+        <div
+          class="description-box"
+          id="patternDescription"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <strong>Pattern description:</strong>
+          A three-lobed looping figure generated by a 2-to-3 frequency ratio.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+
+    /*
+      ==========================================================================
+      1. DOM REFERENCES
+      ==========================================================================
+      Store frequently used elements once instead of repeatedly searching the
+      document during every animation frame.
+    */
+    const controls = {
+      frequency1: document.getElementById("frequency1"),
+      frequency2: document.getElementById("frequency2"),
+      phase1: document.getElementById("phase1"),
+      phase2: document.getElementById("phase2"),
+      decay: document.getElementById("decay")
+    };
+
+    const outputs = {
+      frequency1: document.getElementById("frequency1Value"),
+      frequency2: document.getElementById("frequency2Value"),
+      phase1: document.getElementById("phase1Value"),
+      phase2: document.getElementById("phase2Value"),
+      decay: document.getElementById("decayValue")
+    };
+
+    const pathElement = document.getElementById("harmonographPath");
+    const penMarker = document.getElementById("penMarker");
+    const playPauseButton = document.getElementById("playPauseButton");
+    const resetButton = document.getElementById("resetButton");
+    const patternDescription = document.getElementById("patternDescription");
+    const svgDescription = document.getElementById("svgDescription");
+    const ratioStatus = document.getElementById("ratioStatus");
+    const progressStatus = document.getElementById("progressStatus");
+    const animationStatus = document.getElementById("animationStatus");
+
+    /*
+      ==========================================================================
+      2. VISUALIZATION CONSTANTS
+      ==========================================================================
+    */
+
+    // The SVG viewBox is 700 by 700, so its center is at (350, 350).
+    const SVG_CENTER = 350;
+
+    // The maximum visible oscillation amplitude in SVG coordinate units.
+    const SVG_AMPLITUDE = 290;
+
+    /*
+      A larger total time produces more turns and lets friction visibly pull
+      the path inward. The curve is sampled into a finite array of points.
+    */
+    const TOTAL_TIME = 40;
+    const TOTAL_POINTS = 3200;
+
+    /*
+      Drawing a few points per frame creates a fluid animation without making
+      the animation excessively long.
+    */
+    const POINTS_PER_FRAME = 10;
+
+    /*
+      ==========================================================================
+      3. ANIMATION STATE
+      ==========================================================================
+      These variables change while the animation is running.
+    */
+    let curvePoints = [];
+    let visiblePointCount = 0;
+    let animationFrameId = null;
+    let isPlaying = true;
+    let completedCurve = false;
+
+    /*
+      This media query detects whether the user has requested reduced motion.
+      In that case, the entire curve is displayed at once.
+    */
+    const reducedMotionQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    );
+
+    /*
+      ==========================================================================
+      4. SMALL MATH HELPERS
+      ==========================================================================
+    */
+
+    /**
+     * Converts degrees from the sliders into radians for Math.sin().
+     *
+     * JavaScript's trigonometric functions use radians:
+     * 180 degrees = π radians.
+     */
+    function degreesToRadians(degrees) {
+      return degrees * Math.PI / 180;
+    }
+
+    /**
+     * Returns the greatest common divisor of two positive integers.
+     *
+     * This uses Euclid's algorithm:
+     * repeatedly replace the larger problem with the remainder until the
+     * remainder reaches zero.
+     */
+    function greatestCommonDivisor(a, b) {
+      let first = Math.abs(Math.round(a));
+      let second = Math.abs(Math.round(b));
+
+      while (second !== 0) {
+        const remainder = first % second;
+        first = second;
+        second = remainder;
+      }
+
+      return first || 1;
+    }
+
+    /**
+     * Finds a simple approximate integer ratio for two frequencies.
+     *
+     * Frequencies can be decimal values, so we test small denominator pairs
+     * and keep whichever pair most closely matches f1 / f2.
+     */
+    function approximateRatio(frequency1, frequency2, maximumPart = 12) {
+      const target = frequency1 / frequency2;
+
+      let bestNumerator = 1;
+      let bestDenominator = 1;
+      let smallestError = Infinity;
+
+      for (
+        let denominator = 1;
+        denominator <= maximumPart;
+        denominator += 1
+      ) {
+        for (
+          let numerator = 1;
+          numerator <= maximumPart;
+          numerator += 1
+        ) {
+          const candidate = numerator / denominator;
+          const error = Math.abs(candidate - target);
+
+          if (error < smallestError) {
+            smallestError = error;
+            bestNumerator = numerator;
+            bestDenominator = denominator;
+          }
+        }
+      }
+
+      const divisor = greatestCommonDivisor(
+        bestNumerator,
+        bestDenominator
+      );
+
+      return {
+        numerator: bestNumerator / divisor,
+        denominator: bestDenominator / divisor,
+        error: smallestError
+      };
+    }
+
+    /*
+      ==========================================================================
+      5. READ AND DISPLAY CONTROL VALUES
+      ==========================================================================
+    */
+
+    /**
+     * Reads all slider values and converts them from strings to numbers.
+     */
+    function getParameters() {
+      return {
+        frequency1: Number(controls.frequency1.value),
+        frequency2: Number(controls.frequency2.value),
+        phase1Degrees: Number(controls.phase1.value),
+        phase2Degrees: Number(controls.phase2.value),
+        decay: Number(controls.decay.value)
+      };
+    }
+
+    /**
+     * Updates the numeric text shown next to each slider.
+     */
+    function updateControlOutputs(parameters) {
+      outputs.frequency1.value = parameters.frequency1.toFixed(2);
+      outputs.frequency2.value = parameters.frequency2.toFixed(2);
+      outputs.phase1.value = `${parameters.phase1Degrees.toFixed(0)}°`;
+      outputs.phase2.value = `${parameters.phase2Degrees.toFixed(0)}°`;
+      outputs.decay.value = parameters.decay.toFixed(3);
+    }
+
+    /*
+      ==========================================================================
+      6. HARMONOGRAPH MATH ENGINE
+      ==========================================================================
+    */
+
+    /**
+     * Calculates all parametric curve points before the drawing begins.
+     *
+     * The physical equations are:
+     *
+     * x(t) = sin(f1 × t + p1) × e^(-d × t)
+     * y(t) = sin(f2 × t + p2) × e^(-d × t)
+     *
+     * Mathematical y-values increase upward, but SVG y-coordinates increase
+     * downward. Subtracting y from the center corrects that difference.
+     */
+    function calculateCurvePoints(parameters) {
+      const phase1Radians = degreesToRadians(
+        parameters.phase1Degrees
+      );
+
+      const phase2Radians = degreesToRadians(
+        parameters.phase2Degrees
+      );
+
+      const points = [];
+
+      for (let index = 0; index < TOTAL_POINTS; index += 1) {
+        /*
+          Convert the array index into a time value from 0 to TOTAL_TIME.
+        */
+        const progress = index / (TOTAL_POINTS - 1);
+        const time = progress * TOTAL_TIME;
+
+        /*
+          Exponential decay simulates energy lost through friction.
+          At time 0, decayFactor is 1. It becomes smaller as time increases.
+        */
+        const decayFactor = Math.exp(-parameters.decay * time);
+
+        const mathematicalX =
+          Math.sin(
+            parameters.frequency1 * time + phase1Radians
+          ) * decayFactor;
+
+        const mathematicalY =
+          Math.sin(
+            parameters.frequency2 * time + phase2Radians
+          ) * decayFactor;
+
+        /*
+          Map normalized values near -1 through +1 into SVG coordinates.
+        */
+        const svgX =
+          SVG_CENTER + mathematicalX * SVG_AMPLITUDE;
+
+        const svgY =
+          SVG_CENTER - mathematicalY * SVG_AMPLITUDE;
+
+        points.push({
+          x: svgX,
+          y: svgY
+        });
+      }
+
+      return points;
+    }
+
+    /**
+     * Converts part of the point array into an SVG path string.
+     *
+     * The first point begins with M, meaning "move to."
+     * Every later point begins with L, meaning "draw a line to."
+     */
+    function buildPathData(points, pointCount) {
+      if (points.length === 0 || pointCount === 0) {
+        return "";
+      }
+
+      const safeCount = Math.min(pointCount, points.length);
+      const pathCommands = [];
+
+      for (let index = 0; index < safeCount; index += 1) {
+        const point = points[index];
+        const command = index === 0 ? "M" : "L";
+
+        /*
+          Two decimal places are more than enough for a smooth SVG curve and
+          keep the path string smaller than using full floating-point values.
+        */
+        pathCommands.push(
+          `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
+        );
+      }
+
+      return pathCommands.join(" ");
+    }
+
+    /*
+      ==========================================================================
+      7. ACCESSIBLE PATTERN DESCRIPTION
+      ==========================================================================
+    */
+
+    /**
+     * Produces a human-readable explanation of the current geometry.
+     *
+     * The description is intentionally interpretive rather than claiming an
+     * exact mathematical classification for every possible decimal frequency.
+     */
+    function createPatternDescription(parameters) {
+      const ratio = approximateRatio(
+        parameters.frequency1,
+        parameters.frequency2
+      );
+
+      const relativeRatioError =
+        ratio.error /
+        Math.max(parameters.frequency1 / parameters.frequency2, 0.001);
+
+      const phaseDifference = (
+        (
+          parameters.phase2Degrees -
+          parameters.phase1Degrees
+        ) % 360 +
+        360
+      ) % 360;
+
+      let ratioDescription;
+
+      if (relativeRatioError < 0.008) {
+        if (
+          ratio.numerator === 1 &&
+          ratio.denominator === 1
+        ) {
+          ratioDescription =
+            "The frequencies are nearly equal, producing a simple diagonal, elliptical, or circular motion depending on the phase difference.";
+        } else {
+          const likelyLobes = Math.max(
+            ratio.numerator,
+            ratio.denominator
+          );
+
+          ratioDescription =
+            `The frequencies are close to the simple ratio ` +
+            `${ratio.numerator} to ${ratio.denominator}, creating a regular ` +
+            `repeating figure with roughly ${likelyLobes} prominent loops or lobes.`;
+        }
+      } else if (relativeRatioError < 0.035) {
+        ratioDescription =
+          `The frequencies are near the ratio ${ratio.numerator} to ` +
+          `${ratio.denominator}. The pattern almost repeats, so its loops ` +
+          `slowly drift and form a layered, woven appearance.`;
+      } else {
+        ratioDescription =
+          "The frequencies do not closely match a small whole-number ratio, so the curve forms a dense, slowly shifting network of loops.";
+      }
+
+      let phaseDescription;
+
+      if (
+        phaseDifference < 15 ||
+        phaseDifference > 345
+      ) {
+        phaseDescription =
+          "The oscillations begin almost in phase, emphasizing diagonal alignment.";
+      } else if (
+        Math.abs(phaseDifference - 180) < 15
+      ) {
+        phaseDescription =
+          "The oscillations begin nearly opposite in phase, reversing one direction of the figure.";
+      } else if (
+        Math.abs(phaseDifference - 90) < 15 ||
+        Math.abs(phaseDifference - 270) < 15
+      ) {
+        phaseDescription =
+          "The phase offset is close to a quarter cycle, which encourages rounded loops and rotational symmetry.";
+      } else {
+        phaseDescription =
+          `The oscillations begin ${Math.round(phaseDifference)} degrees apart, skewing the loops away from perfect horizontal or vertical symmetry.`;
+      }
+
+      let decayDescription;
+
+      if (parameters.decay < 0.005) {
+        decayDescription =
+          "Friction is almost absent, so the curve maintains nearly constant size.";
+      } else if (parameters.decay < 0.03) {
+        decayDescription =
+          "Gentle friction makes the drawing gradually spiral inward.";
+      } else if (parameters.decay < 0.07) {
+        decayDescription =
+          "Moderate friction noticeably contracts each successive loop toward the center.";
+      } else {
+        decayDescription =
+          "Strong friction rapidly shrinks the motion, concentrating most detail near the outer edge and center.";
+      }
+
+      return `${ratioDescription} ${phaseDescription} ${decayDescription}`;
+    }
+
+    /**
+     * Updates both the visible live region and the SVG's textual description.
+     */
+    function updateAccessibleDescription(parameters) {
+      const description = createPatternDescription(parameters);
+
+      patternDescription.innerHTML =
+        `<strong>Pattern description:</strong> ${description}`;
+
+      svgDescription.textContent =
+        `Animated harmonograph curve. ${description}`;
+    }
+
+    /*
+      ==========================================================================
+      8. VISUAL STATUS HELPERS
+      ==========================================================================
+    */
+
+    /**
+     * Moves the circular pen marker to the latest visible curve point.
+     */
+    function updatePenMarker() {
+      if (curvePoints.length === 0 || visiblePointCount === 0) {
+        penMarker.setAttribute("cx", String(SVG_CENTER));
+        penMarker.setAttribute("cy", String(SVG_CENTER));
+        penMarker.hidden = true;
+        return;
+      }
+
+      const lastVisibleIndex = Math.min(
+        visiblePointCount - 1,
+        curvePoints.length - 1
+      );
+
+      const point = curvePoints[lastVisibleIndex];
+
+      penMarker.setAttribute("cx", point.x.toFixed(2));
+      penMarker.setAttribute("cy", point.y.toFixed(2));
+      penMarker.hidden = false;
+    }
+
+    /**
+     * Updates progress, ratio, button labels, and ARIA button state.
+     */
+    function updateAnimationInterface() {
+      const progress =
+        curvePoints.length === 0
+          ? 0
+          : visiblePointCount / curvePoints.length;
+
+      progressStatus.textContent =
+        `${Math.round(progress * 100)}%`;
+
+      if (completedCurve) {
+        animationStatus.textContent = "Complete";
+      } else {
+        animationStatus.textContent = isPlaying
+          ? "Playing"
+          : "Paused";
+      }
+
+      /*
+        aria-pressed is true when the animation is paused because pressing the
+        toggle button has activated its paused state.
+      */
+      playPauseButton.setAttribute(
+        "aria-pressed",
+        String(!isPlaying)
+      );
+
+      if (completedCurve) {
+        playPauseButton.textContent = "Play again";
+      } else {
+        playPauseButton.textContent =
+          isPlaying ? "Pause" : "Play";
+      }
+    }
+
+    /*
+      ==========================================================================
+      9. ANIMATION LOOP
+      ==========================================================================
+    */
+
+    /**
+     * Cancels any frame that is waiting to run.
+     *
+     * This prevents two animation loops from running at the same time after
+     * a slider adjustment or reset.
+     */
+    function cancelCurrentAnimationFrame() {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    }
+
+    /**
+     * Draws the next small portion of the curve.
+     *
+     * requestAnimationFrame asks the browser to run this function just before
+     * the next screen repaint. This produces smoother motion than setInterval.
+     */
+    function animateCurve() {
+      animationFrameId = null;
+
+      /*
+        Exit immediately when the user has paused the animation.
+      */
+      if (!isPlaying) {
+        updateAnimationInterface();
+        return;
+      }
+
+      /*
+        Reveal a small group of points during each frame.
+      */
+      visiblePointCount = Math.min(
+        visiblePointCount + POINTS_PER_FRAME,
+        curvePoints.length
+      );
+
+      pathElement.setAttribute(
+        "d",
+        buildPathData(curvePoints, visiblePointCount)
+      );
+
+      updatePenMarker();
+
+      /*
+        When all points are visible, the animation is complete.
+      */
+      if (visiblePointCount >= curvePoints.length) {
+        completedCurve = true;
+        isPlaying = false;
+        updateAnimationInterface();
+        return;
+      }
+
+      completedCurve = false;
+      updateAnimationInterface();
+
+      /*
+        Schedule the next frame only after the current frame has finished.
+      */
+      animationFrameId = requestAnimationFrame(animateCurve);
+    }
+
+    /**
+     * Starts or resumes the drawing loop.
+     */
+    function startAnimation() {
+      cancelCurrentAnimationFrame();
+
+      /*
+        Users who request reduced motion receive the complete graph instantly.
+      */
+      if (reducedMotionQuery.matches) {
+        visiblePointCount = curvePoints.length;
+        completedCurve = true;
+        isPlaying = false;
+
+        pathElement.setAttribute(
+          "d",
+          buildPathData(curvePoints, visiblePointCount)
+        );
+
+        updatePenMarker();
+        updateAnimationInterface();
+        return;
+      }
+
+      isPlaying = true;
+      completedCurve = false;
+      updateAnimationInterface();
+
+      animationFrameId = requestAnimationFrame(animateCurve);
+    }
+
+    /**
+     * Restarts the existing curve from its first point.
+     *
+     * This function does not recalculate the harmonograph math because the
+     * slider values have not changed.
+     */
+    function resetAnimation() {
+      cancelCurrentAnimationFrame();
+
+      visiblePointCount = 0;
+      completedCurve = false;
+      isPlaying = true;
+
+      pathElement.setAttribute("d", "");
+      updatePenMarker();
+      updateAnimationInterface();
+      startAnimation();
+    }
+
+    /*
+      ==========================================================================
+      10. REBUILD THE CURVE AFTER CONTROL CHANGES
+      ==========================================================================
+    */
+
+    /**
+     * Recalculates every point, updates text, and restarts the animation.
+     */
+    function rebuildVisualization() {
+      cancelCurrentAnimationFrame();
+
+      const parameters = getParameters();
+
+      updateControlOutputs(parameters);
+      updateAccessibleDescription(parameters);
+
+      ratioStatus.textContent =
+        `${parameters.frequency1.toFixed(2)} : ` +
+        `${parameters.frequency2.toFixed(2)}`;
+
+      curvePoints = calculateCurvePoints(parameters);
+      visiblePointCount = 0;
+      completedCurve = false;
+
+      pathElement.setAttribute("d", "");
+      updatePenMarker();
+      startAnimation();
+    }
+
+    /*
+      ==========================================================================
+      11. EVENT HANDLERS
+      ==========================================================================
+    */
+
+    /**
+     * Toggle between playing and paused states.
+     */
+    function togglePlayPause() {
+      /*
+        When the finished curve's button says "Play again," restart from zero.
+      */
+      if (completedCurve) {
+        resetAnimation();
+        return;
+      }
+
+      isPlaying = !isPlaying;
+      updateAnimationInterface();
+
+      if (isPlaying) {
+        cancelCurrentAnimationFrame();
+        animationFrameId = requestAnimationFrame(animateCurve);
+      } else {
+        cancelCurrentAnimationFrame();
+      }
+    }
+
+    /*
+      The input event fires continuously while a slider is dragged, making the
+      visualization feel immediate and interactive.
+    */
+    Object.values(controls).forEach((control) => {
+      control.addEventListener("input", rebuildVisualization);
+    });
+
+    playPauseButton.addEventListener("click", togglePlayPause);
+    resetButton.addEventListener("click", resetAnimation);
+
+    /*
+      If the user's reduced-motion preference changes while the page is open,
+      rebuild the visualization to respect the new preference.
+    */
+    reducedMotionQuery.addEventListener(
+      "change",
+      rebuildVisualization
+    );
+
+    /*
+      ==========================================================================
+      12. INITIALIZATION
+      ==========================================================================
+      Generate the first point set and begin drawing as soon as the page loads.
+    */
+    rebuildVisualization();
+  </script>
+</body>
+</html>
